@@ -271,7 +271,7 @@ async function run(): Promise<void> {
         }
 
         core.setOutput("approval-status", "rejected");
-        process.exit(0);
+        process.exit(1);
       },
     );
 
@@ -285,4 +285,3 @@ async function run(): Promise<void> {
 }
 
 run();
-
