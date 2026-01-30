@@ -42,7 +42,7 @@ const slackAppToken = process.env.SLACK_APP_TOKEN || "";
 const channel_id = process.env.SLACK_CHANNEL_ID || "";
 const customBlocks = core.getInput('custom-blocks') || "[]";
 const overrideBaseBlocks = core.getInput('override-base-blocks') === 'true';
-const messageHeader = core.getInput('message-header') || 'GitHub Actions Approval Request';
+const messageHeaderInput = core.getInput('message-header');
 const messageFieldsRaw = core.getInput('message-fields');
 // Configure log level with priority: RUNNER_DEBUG > SLACK_LOG_LEVEL > WARN (default)
 const logLevelMap = {
@@ -74,7 +74,6 @@ async function run() {
         const run_id = process.env.GITHUB_RUN_ID || "";
         const actionsUrl = `${github_server_url}/${github_repos}/actions/runs/${run_id}`;
         const workflow = process.env.GITHUB_WORKFLOW || "";
-        const runnerOS = process.env.RUNNER_OS || "";
         const actor = process.env.GITHUB_ACTOR || "";
         // Store message timestamp and blocks for timeout handling
         let messageTs = "";
@@ -124,40 +123,59 @@ async function run() {
         process.on('SIGTERM', handleTimeout);
         process.on('SIGINT', handleTimeout);
         (async () => {
-            let fieldElements = [];
+            const messageHeader = messageHeaderInput || `${workflow} Approval`;
+            let baseBlocks;
             if (messageFieldsRaw) {
                 const parsedFields = JSON.parse(messageFieldsRaw);
-                fieldElements = parsedFields.map((field) => ({
+                const fieldElements = parsedFields.map((field) => ({
                     "type": "mrkdwn",
                     "text": `*${field.label}:*\n${field.value}`
                 }));
-            }
-            else {
-                fieldElements = [
-                    { "type": "mrkdwn", "text": `*GitHub Actor:*\n${actor}` },
-                    { "type": "mrkdwn", "text": `*Repos:*\n${github_server_url}/${github_repos}` },
-                    { "type": "mrkdwn", "text": `*Actions URL:*\n${actionsUrl}` },
-                    { "type": "mrkdwn", "text": `*GITHUB_RUN_ID:*\n${run_id}` },
-                    { "type": "mrkdwn", "text": `*Workflow:*\n${workflow}` },
-                    { "type": "mrkdwn", "text": `*RunnerOS:*\n${runnerOS}` },
+                baseBlocks = [
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": messageHeader,
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "fields": fieldElements
+                    },
+                    {
+                        "type": "divider"
+                    },
                 ];
             }
-            const baseBlocks = [
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": messageHeader,
-                    }
-                },
-                {
-                    "type": "section",
-                    "fields": fieldElements
-                },
-                {
-                    "type": "divider"
-                },
-            ];
+            else {
+                baseBlocks = [
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": messageHeader,
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            { "type": "mrkdwn", "text": `*GitHub Actor:*\n${actor}` },
+                            { "type": "mrkdwn", "text": `*Repo:*\n${github_server_url}/${github_repos}` },
+                        ]
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": `*Actions URL:*\n${actionsUrl}`,
+                        }
+                    },
+                    {
+                        "type": "divider"
+                    },
+                ];
+            }
             const actionBlock = {
                 "type": "actions",
                 "elements": [

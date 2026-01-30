@@ -11,9 +11,9 @@ inputs:
     required: false
     default: 'false'
   message-header:
-    description: 'Override the header text displayed in the Slack message'
+    description: 'Override the header text displayed in the Slack message (defaults to "<workflow name> Approval")'
     required: false
-    default: 'GitHub Actions Approval Request'
+    default: ''
   message-fields:
     description: 'JSON array of {label, value} objects to replace default metadata fields'
     required: false
