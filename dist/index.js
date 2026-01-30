@@ -275,7 +275,7 @@ async function run() {
                 logger.error(error);
             }
             core.setOutput("approval-status", "rejected");
-            process.exit(0);
+            process.exit(1);
         });
         (async () => {
             await app.start(3000);
