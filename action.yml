@@ -10,6 +10,17 @@ inputs:
     description: 'If true, replaces default workflow information with custom-blocks (keeps Approve/Reject buttons)'
     required: false
     default: 'false'
+  message-header:
+    description: 'Override the header text displayed in the Slack message'
+    required: false
+    default: 'GitHub Actions Approval Request'
+  message-fields:
+    description: 'JSON array of {label, value} objects to replace default metadata fields'
+    required: false
+    default: ''
+outputs:
+  approval-status:
+    description: 'The result of the approval: approved, rejected, or timeout'
 runs:
   using: "node24"
   main: "dist/index.js"

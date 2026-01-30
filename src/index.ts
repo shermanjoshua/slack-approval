@@ -9,6 +9,8 @@ const slackAppToken = process.env.SLACK_APP_TOKEN || ""
 const channel_id    = process.env.SLACK_CHANNEL_ID || ""
 const customBlocks  = core.getInput('custom-blocks') || "[]"
 const overrideBaseBlocks = core.getInput('override-base-blocks') === 'true'
+const messageHeader = core.getInput('message-header') || 'GitHub Actions Approval Request'
+const messageFieldsRaw = core.getInput('message-fields')
 
 // Configure log level with priority: RUNNER_DEBUG > SLACK_LOG_LEVEL > WARN (default)
 const logLevelMap: { [key: string]: LogLevel } = {
@@ -91,6 +93,7 @@ async function run(): Promise<void> {
           console.error('Failed to update Slack message on timeout:', error);
         }
       }
+      core.setOutput('approval-status', 'timeout');
       process.exit(1);
     };
 
@@ -98,42 +101,36 @@ async function run(): Promise<void> {
     process.on('SIGINT', handleTimeout);
 
     (async () => {
+      let fieldElements: { type: "mrkdwn"; text: string }[] = [];
+
+      if (messageFieldsRaw) {
+        const parsedFields: { label: string; value: string }[] = JSON.parse(messageFieldsRaw);
+        fieldElements = parsedFields.map((field) => ({
+          "type": "mrkdwn" as const,
+          "text": `*${field.label}:*\n${field.value}`
+        }));
+      } else {
+        fieldElements = [
+          { "type": "mrkdwn" as const, "text": `*GitHub Actor:*\n${actor}` },
+          { "type": "mrkdwn" as const, "text": `*Repos:*\n${github_server_url}/${github_repos}` },
+          { "type": "mrkdwn" as const, "text": `*Actions URL:*\n${actionsUrl}` },
+          { "type": "mrkdwn" as const, "text": `*GITHUB_RUN_ID:*\n${run_id}` },
+          { "type": "mrkdwn" as const, "text": `*Workflow:*\n${workflow}` },
+          { "type": "mrkdwn" as const, "text": `*RunnerOS:*\n${runnerOS}` },
+        ];
+      }
+
       const baseBlocks: (KnownBlock | Block)[] = [
             {
               "type": "section",
               "text": {
                   "type": "mrkdwn",
-                  "text": `GitHub Actions Approval Request`,
+                  "text": messageHeader,
                 }
             },
             {
               "type": "section",
-              "fields": [
-                {
-                  "type": "mrkdwn",
-                  "text": `*GitHub Actor:*\n${actor}`
-                },
-                {
-                  "type": "mrkdwn",
-                  "text": `*Repos:*\n${github_server_url}/${github_repos}`
-                },
-                {
-                  "type": "mrkdwn",
-                  "text": `*Actions URL:*\n${actionsUrl}`
-                },
-                {
-                  "type": "mrkdwn",
-                  "text": `*GITHUB_RUN_ID:*\n${run_id}`
-                },
-                {
-                  "type": "mrkdwn",
-                  "text": `*Workflow:*\n${workflow}`
-                },
-                {
-                  "type": "mrkdwn",
-                  "text": `*RunnerOS:*\n${runnerOS}`
-                }
-              ]
+              "fields": fieldElements
             },
             {
               "type": "divider"
@@ -212,6 +209,7 @@ async function run(): Promise<void> {
         logger.error(error)
       }
 
+      core.setOutput('approval-status', 'approved');
       process.exit(0)
     });
 
@@ -244,6 +242,7 @@ async function run(): Promise<void> {
         logger.error(error)
       }
 
+      core.setOutput('approval-status', 'rejected');
       process.exit(1)
     });
 
