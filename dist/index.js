@@ -40,23 +40,24 @@ const token = process.env.SLACK_BOT_TOKEN || "";
 const signingSecret = process.env.SLACK_SIGNING_SECRET || "";
 const slackAppToken = process.env.SLACK_APP_TOKEN || "";
 const channel_id = process.env.SLACK_CHANNEL_ID || "";
-const customBlocks = core.getInput('custom-blocks') || "[]";
-const overrideBaseBlocks = core.getInput('override-base-blocks') === 'true';
-const messageHeaderInput = core.getInput('message-header');
-const messageFieldsRaw = core.getInput('message-fields');
+const customBlocks = core.getInput("custom-blocks") || "[]";
+const overrideBaseBlocks = core.getInput("override-base-blocks") === "true";
+const messageHeaderInput = core.getInput("message-header");
+const messageFieldsRaw = core.getInput("message-fields");
 // Configure log level with priority: RUNNER_DEBUG > SLACK_LOG_LEVEL > WARN (default)
 const logLevelMap = {
-    "DEBUG": bolt_1.LogLevel.DEBUG,
-    "INFO": bolt_1.LogLevel.INFO,
-    "WARN": bolt_1.LogLevel.WARN,
-    "ERROR": bolt_1.LogLevel.ERROR
+    DEBUG: bolt_1.LogLevel.DEBUG,
+    INFO: bolt_1.LogLevel.INFO,
+    WARN: bolt_1.LogLevel.WARN,
+    ERROR: bolt_1.LogLevel.ERROR,
 };
 let logLevel = bolt_1.LogLevel.WARN; // default
-if (process.env.RUNNER_DEBUG === '1') {
+if (process.env.RUNNER_DEBUG === "1") {
     logLevel = bolt_1.LogLevel.DEBUG;
 }
 else if (process.env.SLACK_LOG_LEVEL) {
-    logLevel = logLevelMap[process.env.SLACK_LOG_LEVEL.toUpperCase()] || bolt_1.LogLevel.WARN;
+    logLevel =
+        logLevelMap[process.env.SLACK_LOG_LEVEL.toUpperCase()] || bolt_1.LogLevel.WARN;
 }
 const app = new bolt_1.App({
     token: token,
@@ -84,7 +85,7 @@ async function run() {
             parsedCustomBlocks = JSON.parse(customBlocks);
         }
         catch (error) {
-            console.warn('Failed to parse custom-blocks, using empty array:', error);
+            console.warn("Failed to parse custom-blocks, using empty array:", error);
         }
         // Handle timeout (SIGTERM is sent by GitHub Actions before timeout kill)
         const handleTimeout = async () => {
@@ -98,10 +99,10 @@ async function run() {
                     updatedBlocks.pop();
                     // Add timeout message
                     const timeoutBlock = {
-                        'type': 'section',
-                        'text': {
-                            'type': 'mrkdwn',
-                            'text': '⏱️ *Timeout:* The approval time has expired and the deployment was cancelled',
+                        type: "section",
+                        text: {
+                            type: "mrkdwn",
+                            text: "⏱️ *Timeout:* The approval time has expired and the deployment was cancelled",
                         },
                     };
                     updatedBlocks.push(timeoutBlock);
@@ -109,99 +110,102 @@ async function run() {
                         channel: channel_id,
                         ts: messageTs,
                         blocks: updatedBlocks,
-                        text: "GitHub Actions Approval request - Timeout"
+                        text: "GitHub Actions Approval request - Timeout",
                     });
-                    console.log('Slack message updated with timeout notification');
+                    console.log("Slack message updated with timeout notification");
                 }
                 catch (error) {
-                    console.error('Failed to update Slack message on timeout:', error);
+                    console.error("Failed to update Slack message on timeout:", error);
                 }
             }
-            core.setOutput('approval-status', 'timeout');
+            core.setOutput("approval-status", "timeout");
             process.exit(1);
         };
-        process.on('SIGTERM', handleTimeout);
-        process.on('SIGINT', handleTimeout);
+        process.on("SIGTERM", handleTimeout);
+        process.on("SIGINT", handleTimeout);
         (async () => {
             const messageHeader = messageHeaderInput || `${workflow} Approval`;
             let baseBlocks;
             if (messageFieldsRaw) {
                 const parsedFields = JSON.parse(messageFieldsRaw);
                 const fieldElements = parsedFields.map((field) => ({
-                    "type": "mrkdwn",
-                    "text": `*${field.label}:*\n${field.value}`
+                    type: "mrkdwn",
+                    text: `*${field.label}:*\n${field.value}`,
                 }));
                 baseBlocks = [
                     {
-                        "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": messageHeader,
-                        }
+                        type: "section",
+                        text: {
+                            type: "mrkdwn",
+                            text: messageHeader,
+                        },
                     },
                     {
-                        "type": "section",
-                        "fields": fieldElements
+                        type: "section",
+                        fields: fieldElements,
                     },
                     {
-                        "type": "divider"
+                        type: "divider",
                     },
                 ];
             }
             else {
                 baseBlocks = [
                     {
-                        "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": messageHeader,
-                        }
+                        type: "section",
+                        text: {
+                            type: "mrkdwn",
+                            text: messageHeader,
+                        },
                     },
                     {
-                        "type": "section",
-                        "fields": [
-                            { "type": "mrkdwn", "text": `*GitHub Actor:*\n${actor}` },
-                            { "type": "mrkdwn", "text": `*Repo:*\n${github_server_url}/${github_repos}` },
-                        ]
+                        type: "section",
+                        fields: [
+                            { type: "mrkdwn", text: `*GitHub Actor:*\n${actor}` },
+                            {
+                                type: "mrkdwn",
+                                text: `*Repo:*\n${github_server_url}/${github_repos}`,
+                            },
+                        ],
                     },
                     {
-                        "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": `*Actions URL:*\n${actionsUrl}`,
-                        }
+                        type: "section",
+                        text: {
+                            type: "mrkdwn",
+                            text: `*Actions URL:*\n${actionsUrl}`,
+                        },
                     },
                     {
-                        "type": "divider"
+                        type: "divider",
                     },
                 ];
             }
             const actionBlock = {
-                "type": "actions",
-                "elements": [
+                type: "actions",
+                elements: [
                     {
-                        "type": "button",
-                        "text": {
-                            "type": "plain_text",
-                            "emoji": true,
-                            "text": "Approve"
+                        type: "button",
+                        text: {
+                            type: "plain_text",
+                            emoji: true,
+                            text: "Approve",
                         },
-                        "style": "primary",
-                        "value": "approve",
-                        "action_id": "slack-approval-approve"
+                        style: "primary",
+                        value: "approve",
+                        action_id: "slack-approval-approve",
                     },
                     {
-                        "type": "button",
-                        "text": {
-                            "type": "plain_text",
-                            "emoji": true,
-                            "text": "Reject"
+                        type: "button",
+                        text: {
+                            type: "plain_text",
+                            emoji: true,
+                            text: "Reject",
                         },
-                        "style": "danger",
-                        "value": "reject",
-                        "action_id": "slack-approval-reject"
-                    }
-                ]
+                        style: "danger",
+                        value: "reject",
+                        action_id: "slack-approval-reject",
+                    },
+                ],
             };
             const messageBlocks = overrideBaseBlocks
                 ? [...parsedCustomBlocks, actionBlock]
@@ -209,73 +213,73 @@ async function run() {
             const result = await web.chat.postMessage({
                 channel: channel_id,
                 text: "GitHub Actions Approval request",
-                blocks: messageBlocks
+                blocks: messageBlocks,
             });
             // Store message timestamp and blocks for timeout handling
             messageTs = result.ts || "";
             sentMessageBlocks = messageBlocks;
         })();
-        app.action('slack-approval-approve', async ({ ack, client, body, logger }) => {
+        app.action("slack-approval-approve", async ({ ack, client, body, logger }) => {
             await ack();
             try {
                 const timestamp = new Date().toISOString();
                 const userId = body.user.id;
                 const user = body.user;
-                const userName = user.username || user.name || 'Unknown';
+                const userName = user.username || user.name || "Unknown";
                 console.log(`✅ APPROVED by ${userName} (${userId}) at ${timestamp}`);
                 const response_blocks = body.message?.blocks;
                 response_blocks.pop();
                 response_blocks.push({
-                    'type': 'section',
-                    'text': {
-                        'type': 'mrkdwn',
-                        'text': `Approved by <@${userId}> `,
+                    type: "section",
+                    text: {
+                        type: "mrkdwn",
+                        text: `Approved by <@${userId}> `,
                     },
                 });
                 await client.chat.update({
                     channel: body.channel?.id || "",
                     ts: body.message?.ts || "",
-                    blocks: response_blocks
+                    blocks: response_blocks,
                 });
             }
             catch (error) {
                 logger.error(error);
             }
-            core.setOutput('approval-status', 'approved');
+            core.setOutput("approval-status", "approved");
             process.exit(0);
         });
-        app.action('slack-approval-reject', async ({ ack, client, body, logger }) => {
+        app.action("slack-approval-reject", async ({ ack, client, body, logger }) => {
             await ack();
             try {
                 const timestamp = new Date().toISOString();
                 const userId = body.user.id;
                 const user = body.user;
-                const userName = user.username || user.name || 'Unknown';
+                const userName = user.username || user.name || "Unknown";
                 console.log(`❌ REJECTED by ${userName} (${userId}) at ${timestamp}`);
                 const response_blocks = body.message?.blocks;
                 response_blocks.pop();
                 response_blocks.push({
-                    'type': 'section',
-                    'text': {
-                        'type': 'mrkdwn',
-                        'text': `Rejected by <@${userId}>`,
+                    type: "section",
+                    text: {
+                        type: "mrkdwn",
+                        text: `Rejected by <@${userId}>`,
                     },
                 });
                 await client.chat.update({
                     channel: body.channel?.id || "",
                     ts: body.message?.ts || "",
-                    blocks: response_blocks
+                    blocks: response_blocks,
                 });
             }
             catch (error) {
                 logger.error(error);
             }
-            core.setOutput('approval-status', 'rejected');
-            process.exit(1);
+            core.setOutput("approval-status", "rejected");
+            process.exit(0);
         });
         (async () => {
             await app.start(3000);
-            console.log('Waiting Approval reaction.....');
+            console.log("Waiting Approval reaction.....");
         })();
     }
     catch (error) {
