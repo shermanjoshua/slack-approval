@@ -1,4 +1,5 @@
 import * as core from "@actions/core";
+import * as github from "@actions/github";
 import { App, BlockAction, LogLevel } from "@slack/bolt";
 import { WebClient } from "@slack/web-api";
 import { KnownBlock, Block } from "@slack/types";
@@ -11,8 +12,8 @@ const customBlocks = core.getInput("custom-blocks") || "[]";
 const overrideBaseBlocks = core.getInput("override-base-blocks") === "true";
 const messageHeaderInput = core.getInput("message-header");
 const messageFieldsRaw = core.getInput("message-fields");
+const githubToken = core.getInput("github-token");
 
-// Configure log level with priority: RUNNER_DEBUG > SLACK_LOG_LEVEL > WARN (default)
 const logLevelMap: { [key: string]: LogLevel } = {
   DEBUG: LogLevel.DEBUG,
   INFO: LogLevel.INFO,
@@ -20,7 +21,7 @@ const logLevelMap: { [key: string]: LogLevel } = {
   ERROR: LogLevel.ERROR,
 };
 
-let logLevel = LogLevel.WARN; // default
+let logLevel = LogLevel.WARN;
 if (process.env.RUNNER_DEBUG === "1") {
   logLevel = LogLevel.DEBUG;
 } else if (process.env.SLACK_LOG_LEVEL) {
@@ -48,11 +49,10 @@ async function run(): Promise<void> {
     const workflow = process.env.GITHUB_WORKFLOW || "";
     const actor = process.env.GITHUB_ACTOR || "";
 
-    // Store message timestamp and blocks for timeout handling
     let messageTs = "";
     let sentMessageBlocks: (KnownBlock | Block)[] = [];
+    let isExiting = false;
 
-    // Parse custom blocks
     let parsedCustomBlocks: (KnownBlock | Block)[] = [];
     try {
       parsedCustomBlocks = JSON.parse(customBlocks);
@@ -60,19 +60,29 @@ async function run(): Promise<void> {
       console.warn("Failed to parse custom-blocks, using empty array:", error);
     }
 
-    // Handle timeout (SIGTERM is sent by GitHub Actions before timeout kill)
+    const octokit = github.getOctokit(githubToken);
+
+    const cancelWorkflowRun = async () => {
+      await octokit.rest.actions.cancelWorkflowRun({
+        owner: github.context.repo.owner,
+        repo: github.context.repo.repo,
+        run_id: github.context.runId,
+      });
+      process.exit(0);
+    };
+
     const handleTimeout = async () => {
+      if (isExiting) return;
+      isExiting = true;
+
       if (messageTs && sentMessageBlocks.length > 0) {
         try {
           const timestamp = new Date().toISOString();
           console.log(`⏱️ TIMEOUT - No response received at ${timestamp}`);
 
-          // Use stored blocks instead of fetching from API
           const updatedBlocks = [...sentMessageBlocks];
-          // Remove the action buttons (last block)
           updatedBlocks.pop();
 
-          // Add timeout message
           const timeoutBlock: KnownBlock | Block = {
             type: "section",
             text: {
@@ -94,7 +104,7 @@ async function run(): Promise<void> {
         }
       }
       core.setOutput("approval-status", "timeout");
-      process.exit(1);
+      await cancelWorkflowRun();
     };
 
     process.on("SIGTERM", handleTimeout);
@@ -198,7 +208,6 @@ async function run(): Promise<void> {
         blocks: messageBlocks,
       });
 
-      // Store message timestamp and blocks for timeout handling
       messageTs = result.ts || "";
       sentMessageBlocks = messageBlocks;
     })();
@@ -243,6 +252,8 @@ async function run(): Promise<void> {
       "slack-approval-reject",
       async ({ ack, client, body, logger }) => {
         await ack();
+        isExiting = true;
+
         try {
           const timestamp = new Date().toISOString();
           const userId = body.user.id;
@@ -271,7 +282,7 @@ async function run(): Promise<void> {
         }
 
         core.setOutput("approval-status", "rejected");
-        process.exit(1);
+        await cancelWorkflowRun();
       },
     );
 

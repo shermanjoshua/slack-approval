@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 const core = __importStar(require("@actions/core"));
+const github = __importStar(require("@actions/github"));
 const bolt_1 = require("@slack/bolt");
 const web_api_1 = require("@slack/web-api");
 const token = process.env.SLACK_BOT_TOKEN || "";
@@ -44,14 +45,14 @@ const customBlocks = core.getInput("custom-blocks") || "[]";
 const overrideBaseBlocks = core.getInput("override-base-blocks") === "true";
 const messageHeaderInput = core.getInput("message-header");
 const messageFieldsRaw = core.getInput("message-fields");
-// Configure log level with priority: RUNNER_DEBUG > SLACK_LOG_LEVEL > WARN (default)
+const githubToken = core.getInput("github-token");
 const logLevelMap = {
     DEBUG: bolt_1.LogLevel.DEBUG,
     INFO: bolt_1.LogLevel.INFO,
     WARN: bolt_1.LogLevel.WARN,
     ERROR: bolt_1.LogLevel.ERROR,
 };
-let logLevel = bolt_1.LogLevel.WARN; // default
+let logLevel = bolt_1.LogLevel.WARN;
 if (process.env.RUNNER_DEBUG === "1") {
     logLevel = bolt_1.LogLevel.DEBUG;
 }
@@ -76,10 +77,9 @@ async function run() {
         const actionsUrl = `${github_server_url}/${github_repos}/actions/runs/${run_id}`;
         const workflow = process.env.GITHUB_WORKFLOW || "";
         const actor = process.env.GITHUB_ACTOR || "";
-        // Store message timestamp and blocks for timeout handling
         let messageTs = "";
         let sentMessageBlocks = [];
-        // Parse custom blocks
+        let isExiting = false;
         let parsedCustomBlocks = [];
         try {
             parsedCustomBlocks = JSON.parse(customBlocks);
@@ -87,17 +87,25 @@ async function run() {
         catch (error) {
             console.warn("Failed to parse custom-blocks, using empty array:", error);
         }
-        // Handle timeout (SIGTERM is sent by GitHub Actions before timeout kill)
+        const octokit = github.getOctokit(githubToken);
+        const cancelWorkflowRun = async () => {
+            await octokit.rest.actions.cancelWorkflowRun({
+                owner: github.context.repo.owner,
+                repo: github.context.repo.repo,
+                run_id: github.context.runId,
+            });
+            process.exit(0);
+        };
         const handleTimeout = async () => {
+            if (isExiting)
+                return;
+            isExiting = true;
             if (messageTs && sentMessageBlocks.length > 0) {
                 try {
                     const timestamp = new Date().toISOString();
                     console.log(`⏱️ TIMEOUT - No response received at ${timestamp}`);
-                    // Use stored blocks instead of fetching from API
                     const updatedBlocks = [...sentMessageBlocks];
-                    // Remove the action buttons (last block)
                     updatedBlocks.pop();
-                    // Add timeout message
                     const timeoutBlock = {
                         type: "section",
                         text: {
@@ -119,7 +127,7 @@ async function run() {
                 }
             }
             core.setOutput("approval-status", "timeout");
-            process.exit(1);
+            await cancelWorkflowRun();
         };
         process.on("SIGTERM", handleTimeout);
         process.on("SIGINT", handleTimeout);
@@ -215,7 +223,6 @@ async function run() {
                 text: "GitHub Actions Approval request",
                 blocks: messageBlocks,
             });
-            // Store message timestamp and blocks for timeout handling
             messageTs = result.ts || "";
             sentMessageBlocks = messageBlocks;
         })();
@@ -250,6 +257,7 @@ async function run() {
         });
         app.action("slack-approval-reject", async ({ ack, client, body, logger }) => {
             await ack();
+            isExiting = true;
             try {
                 const timestamp = new Date().toISOString();
                 const userId = body.user.id;
@@ -275,7 +283,7 @@ async function run() {
                 logger.error(error);
             }
             core.setOutput("approval-status", "rejected");
-            process.exit(1);
+            await cancelWorkflowRun();
         });
         (async () => {
             await app.start(3000);
