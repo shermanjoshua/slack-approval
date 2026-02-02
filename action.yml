@@ -18,6 +18,10 @@ inputs:
     description: 'JSON array of {label, value} objects to replace default metadata fields'
     required: false
     default: ''
+  github-token:
+    description: 'GitHub token for cancelling the workflow run on reject or timeout'
+    required: false
+    default: '${{ github.token }}'
 outputs:
   approval-status:
     description: 'The result of the approval: approved, rejected, or timeout'

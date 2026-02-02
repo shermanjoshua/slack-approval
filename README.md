@@ -2,12 +2,13 @@
 
 custom action to send approval request to Slack
 
-![](https://user-images.githubusercontent.com/35091584/195488201-acc24277-5e0c-431f-a4b3-21b4430d5d80.png)
+![](img/approval.png)
 
 
-- Post a message in Slack with a "Aoorove" and "Reject" buttons. 
-- Clicking on "Approve" will execute next steps.
-- Clicking on "Reject" will cause workflow to fail.
+- Posts a message in Slack with "Approve" and "Reject" buttons.
+- Clicking "Approve" allows the workflow to continue.
+- Clicking "Reject" cancels the workflow run.
+- If the approval times out, the workflow run is cancelled.
 
 # How To Use
 
@@ -21,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: send approval
-        uses: varu3/slack-approval@main
+        uses: ./
         env:
           SLACK_APP_TOKEN: ${{ secrets.SLACK_APP_TOKEN }}
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
@@ -49,7 +50,7 @@ jobs:
     - Channel ID for which you want to send approval.
 
 - Set `timeout-minutes`
-  - Set the time to wait for approval. If the timeout is reached, GitHub Actions will forcefully terminate the workflow.
+  - Set the time to wait for approval. If the timeout is reached, the action updates the Slack message and cancels the workflow run.
 
 ## Custom Blocks
 
@@ -61,7 +62,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: send approval
-        uses: varu3/slack-approval@main
+        uses: ./
         with:
           custom-blocks: |
             [
@@ -93,7 +94,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: send approval
-        uses: varu3/slack-approval@main
+        uses: ./
         with:
           override-base-blocks: true
           custom-blocks: |
@@ -135,7 +136,7 @@ When the `timeout-minutes` limit is reached, the action automatically:
 - Detects the timeout signal from GitHub Actions
 - Disables the Approve/Reject buttons in the Slack message
 - Updates the message with a timeout notification
-- Exits with failure status
+- Cancels the workflow run
 
 The Slack message will be updated to show:
 > ⏱️ **Timeout:** The approval time has expired and the deployment was cancelled
@@ -147,13 +148,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: send approval
-        uses: varu3/slack-approval@main
+        uses: ./
         env:
           SLACK_APP_TOKEN: ${{ secrets.SLACK_APP_TOKEN }}
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
           SLACK_SIGNING_SECRET: ${{ secrets.SLACK_SIGNING_SECRET }}
           SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
-        timeout-minutes: 10  # Timeout after 10 minutes
+        timeout-minutes: 10
 ```
 
 **Note:** No additional Slack OAuth scopes are required for timeout handling. The action stores message blocks locally and does not need to fetch the message from Slack API.
@@ -170,7 +171,7 @@ Control the verbosity of Slack Bolt framework logs using environment variables:
 **Example with explicit log level:**
 ```yaml
 - name: send approval
-  uses: varu3/slack-approval@main
+  uses: ./
   env:
     SLACK_LOG_LEVEL: DEBUG
     SLACK_APP_TOKEN: ${{ secrets.SLACK_APP_TOKEN }}
