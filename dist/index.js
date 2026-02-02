@@ -79736,11 +79736,16 @@ async function run() {
     }
     const octokit = github.getOctokit(githubToken);
     const cancelWorkflowRun = async () => {
-      await octokit.rest.actions.cancelWorkflowRun({
-        owner: github.context.repo.owner,
-        repo: github.context.repo.repo,
-        run_id: github.context.runId
-      });
+      try {
+        await octokit.rest.actions.cancelWorkflowRun({
+          owner: github.context.repo.owner,
+          repo: github.context.repo.repo,
+          run_id: github.context.runId
+        });
+      } catch (error) {
+        console.error("Failed to cancel workflow run:", error);
+        console.error("Ensure the workflow has 'permissions: actions: write'");
+      }
       process.exit(0);
     };
     const handleTimeout = async () => {
