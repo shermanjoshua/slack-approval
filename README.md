@@ -20,6 +20,8 @@ custom action to send approval request to Slack
 jobs:
   approval:
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
     steps:
       - name: send approval
         uses: ./
@@ -30,6 +32,8 @@ jobs:
           SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
         timeout-minutes: 10
 ```
+
+- Set `permissions: actions: write` on the job — required so the action can cancel the workflow run on reject or timeout.
 
 - Set environment variables
 
