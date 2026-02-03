@@ -69,11 +69,12 @@ async function run(): Promise<void> {
           repo: github.context.repo.repo,
           run_id: github.context.runId,
         });
+        await new Promise(() => {});
       } catch (error) {
         console.error("Failed to cancel workflow run:", error);
         console.error("Ensure the workflow has 'permissions: actions: write'");
+        process.exit(1);
       }
-      process.exit(0);
     };
 
     const handleTimeout = async () => {
